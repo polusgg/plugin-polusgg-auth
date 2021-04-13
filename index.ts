@@ -5,6 +5,12 @@ import { MessageReader } from "@nodepolus/framework/src/util/hazelMessage";
 import { Connection } from "@nodepolus/framework/src/protocol/connection";
 import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
+import { Services } from "@polusgg/plugin-polusgg-api/src/services";
+import { ServiceType } from "@polusgg/plugin-polusgg-api/src/types/enums";
+import { TextComponent } from "@nodepolus/framework/src/api/text";
+import { NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
+import { PlayerColor } from "@nodepolus/framework/src/types/enums";
+import { Palette } from "@nodepolus/framework/src/static";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -33,6 +39,24 @@ export default class extends BasePlugin {
     this.server.setInboundPacketTransformer(this.inboundPacketTransformer);
 
     this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
+
+    this.server.on("player.joined", event => {
+      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+
+      if (!auth) {
+        return;
+      }
+
+      if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
+        Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(91, 75, 27).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+      }
+
+      if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
+        const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+
+        Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+      }
+    });
   }
 
   //#region Packet Authentication

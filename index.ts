@@ -1,16 +1,15 @@
 import { UserResponseStructure } from "@polusgg/module-polusgg-auth-api/src/types/userResponseStructure";
 import { Requester } from "@polusgg/module-polusgg-auth-api/src/requester/requester";
+import { NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
 import { BasePlugin, PluginMetadata } from "@nodepolus/framework/src/api/plugin";
 import { MessageReader } from "@nodepolus/framework/src/util/hazelMessage";
-import { Connection } from "@nodepolus/framework/src/protocol/connection";
-import { DisconnectReason } from "@nodepolus/framework/src/types";
-import { Hmac } from "@nodepolus/framework/src/util/hmac";
-import { Services } from "@polusgg/plugin-polusgg-api/src/services";
 import { ServiceType } from "@polusgg/plugin-polusgg-api/src/types/enums";
+import { Connection } from "@nodepolus/framework/src/protocol/connection";
+import { Services } from "@polusgg/plugin-polusgg-api/src/services";
+import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { TextComponent } from "@nodepolus/framework/src/api/text";
-import { NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
-import { PlayerColor } from "@nodepolus/framework/src/types/enums";
 import { Palette } from "@nodepolus/framework/src/static";
+import { Hmac } from "@nodepolus/framework/src/util/hmac";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -43,7 +42,7 @@ export default class extends BasePlugin {
     this.server.on("player.joined", event => {
       const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
-      if (!auth) {
+      if (auth === undefined) {
         return;
       }
 
@@ -55,6 +54,20 @@ export default class extends BasePlugin {
         const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
 
         Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+      }
+    });
+
+    this.server.on("player.color.updated", event => {
+      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+
+      if (auth === undefined) {
+        return;
+      }
+
+      if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
+        const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+
+        Services.get(ServiceType.Name).setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
       }
     });
   }

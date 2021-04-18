@@ -30,7 +30,7 @@ type PolusAuthConfig = {
 };
 
 export default class extends BasePlugin {
-  private readonly requester: Requester = new Requester();
+  private readonly requester: Requester = new Requester("https://account.polus.gg");
 
   constructor(config: PolusAuthConfig) {
     super(pluginMetadata, undefined, config);

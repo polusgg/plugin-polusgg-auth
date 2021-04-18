@@ -1,8 +1,8 @@
 {
-  "name": "@polusgg/plugin-template",
+  "name": "@polusgg/plugin-polusgg-auth",
   "np-plugin": true,
   "version": "1.0.0",
-  "description": "Template repository for creating plugins with NodePolus",
+  "description": "Auth plugin for NodePolus",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/polusgg/plugin-template.git"

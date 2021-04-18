@@ -22,8 +22,8 @@
     "typescript": "^4.1.3"
   },
   "dependencies": {
-    "@nodepolus/framework": "^3.0.1-13",
-    "@polusgg/module-polusgg-auth-api": "^1.0.0",
-    "@polusgg/plugin-polusgg-api": "^1.0.3-6"
+    "@nodepolus/framework": "latest",
+    "@polusgg/module-polusgg-auth-api": "latest",
+    "@polusgg/plugin-polusgg-api": "latest"
   }
 }

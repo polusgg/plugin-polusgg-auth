@@ -35,9 +35,10 @@ export default class extends BasePlugin {
   constructor(config: PolusAuthConfig) {
     super(pluginMetadata, undefined, config);
 
-    this.server.setInboundPacketTransformer(this.inboundPacketTransformer);
+    this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
-    this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
+    //TODO: testing code, remove "test_token"
+    this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token ?? "test_token");
 
     this.server.on("player.joined", event => {
       const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
@@ -75,7 +76,7 @@ export default class extends BasePlugin {
   //#region Packet Authentication
   inboundPacketTransformer(connection: Connection, packet: MessageReader): MessageReader {
     if (packet.readByte() !== 0x80) {
-      this.getLogger().warn("Connection %s attempted send an unauthenticated packet", connection);
+      this.getLogger().warn("Connection %s attempted to send an unauthenticated packet", connection);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
       return MessageReader.fromRawBytes([0x00]);
@@ -85,14 +86,14 @@ export default class extends BasePlugin {
     //16 bytes for client UUID
     //20 bytes for SHA1 HMAC
     if (packet.getLength() < 1 + 16 + 20) {
-      this.getLogger().warn("Connection %s attempted send an invalid authentication packet. It was too short.", connection);
+      this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. It was too short.", connection);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
       return MessageReader.fromRawBytes([0x00]);
     }
 
     if (packet.getLength() <= 1 + 16 + 20) {
-      this.getLogger().warn("Connection %s attempted send an invalid authentication packet. It was empty.", connection);
+      this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. It was empty.", connection);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
       return MessageReader.fromRawBytes([0x00]);
@@ -108,7 +109,7 @@ export default class extends BasePlugin {
       const ok = Hmac.verify(remaining.getBuffer().toString(), hmacResult.getBuffer().toString(), user.api_token);
 
       if (!ok) {
-        this.getLogger().warn("Connection %s attempted send an invalid authentication packet. Their HMAC verify failed.", connection);
+        this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed.", connection);
         connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
         return MessageReader.fromRawBytes([0x00]);
@@ -124,7 +125,7 @@ export default class extends BasePlugin {
         const ok = Hmac.verify(remaining.getBuffer().toString(), hmacResult.getBuffer().toString(), user.api_token);
 
         if (!ok) {
-          this.getLogger().warn("Connection %s attempted send an invalid authentication packet. Their HMAC verify failed.", connection);
+          this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed.", connection);
           connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
           return;
@@ -133,7 +134,7 @@ export default class extends BasePlugin {
         connection.emit("message", remaining);
       })
       .catch(err => {
-        this.getLogger().warn("Connection %s attempted send an invalid authentication packet. The API did not return a valid result (%s).", connection, err);
+        this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. The API did not return a valid result (%s).", connection, err);
         connection.disconnect(DisconnectReason.custom("Authentication Error."));
       });
 

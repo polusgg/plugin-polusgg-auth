@@ -105,7 +105,7 @@ export default class extends BasePlugin {
     if (connection.getMeta<UserResponseStructure | undefined>("pgg.auth.self") !== undefined) {
       const user = connection.getMeta<UserResponseStructure>("pgg.auth.self");
 
-      const ok = Hmac.verify(remaining.getBuffer().toString(), hmacResult.getBuffer().toString(), user.api_token);
+      const ok = Hmac.verify(remaining.getBuffer().toString(), hmacResult.getBuffer().toString(), user.client_token);
 
       if (!ok) {
         this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed.", connection);
@@ -121,7 +121,7 @@ export default class extends BasePlugin {
 
     this.fetchAndCacheUser(uuid, connection)
       .then(user => {
-        const ok = Hmac.verify(remaining.getBuffer().toString(), hmacResult.getBuffer().toString(), user.api_token);
+        const ok = Hmac.verify(remaining.getBuffer().toString(), hmacResult.getBuffer().toString(), user.client_token);
 
         if (!ok) {
           this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed.", connection);

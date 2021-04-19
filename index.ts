@@ -37,8 +37,7 @@ export default class extends BasePlugin {
 
     this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
-    //TODO: testing code, remove "test_token"
-    this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token ?? "test_token");
+    this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
 
     this.server.on("player.joined", event => {
       const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");

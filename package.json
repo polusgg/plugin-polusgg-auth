@@ -1,7 +1,7 @@
 {
   "name": "@polusgg/plugin-polusgg-auth",
   "np-plugin": true,
-  "version": "1.0.0",
+  "version": "1.0.1-0",
   "description": "Auth plugin for NodePolus",
   "repository": {
     "type": "git",

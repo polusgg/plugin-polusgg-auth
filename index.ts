@@ -27,6 +27,7 @@ const pluginMetadata: PluginMetadata = {
 
 type PolusAuthConfig = {
   token: string;
+  enableAuth: boolean;
 };
 
 export default class extends BasePlugin {
@@ -35,41 +36,47 @@ export default class extends BasePlugin {
   constructor(config: PolusAuthConfig) {
     super(pluginMetadata, undefined, config);
 
-    this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
+    const enableAuthPackets = process.env.NP_DISABLE_AUTH !== undefined
+      ? process.env.NP_DISABLE_AUTH.trim().toLowerCase() !== "true"
+      : config.enableAuth;
 
-    this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
+    if (enableAuthPackets) {
+      this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
-    this.server.on("player.joined", event => {
-      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+      this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
 
-      if (auth === undefined) {
-        return;
-      }
+      this.server.on("player.joined", event => {
+        const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
-      if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
-        Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(91, 75, 27).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
-      }
+        if (auth === undefined) {
+          return;
+        }
 
-      if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
-        const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+        if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
+          Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(91, 75, 27).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+        }
 
-        Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
-      }
-    });
+        if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
+          const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
 
-    this.server.on("player.color.updated", event => {
-      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+          Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+        }
+      });
 
-      if (auth === undefined) {
-        return;
-      }
+      this.server.on("player.color.updated", event => {
+        const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
-      if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
-        const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+        if (auth === undefined) {
+          return;
+        }
 
-        Services.get(ServiceType.Name).setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
-      }
-    });
+        if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
+          const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+
+          Services.get(ServiceType.Name).setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+        }
+      });
+    }
   }
 
   //#region Packet Authentication

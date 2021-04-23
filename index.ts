@@ -1,6 +1,6 @@
 import { UserResponseStructure } from "@polusgg/module-polusgg-auth-api/src/types/userResponseStructure";
 import { Requester } from "@polusgg/module-polusgg-auth-api/src/requester/requester";
-import { NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
+import { NameService, NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
 import { BasePlugin, PluginMetadata } from "@nodepolus/framework/src/api/plugin";
 import { MessageReader } from "@nodepolus/framework/src/util/hazelMessage";
 import { ServiceType } from "@polusgg/plugin-polusgg-api/src/types/enums";
@@ -47,6 +47,8 @@ export default class extends BasePlugin {
 
       this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
 
+      const nameService = Services.get(ServiceType.Name);
+
       this.server.on("player.joined", event => {
         const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
@@ -54,14 +56,18 @@ export default class extends BasePlugin {
           return;
         }
 
+        nameService.setForBatch(event.getLobby().getConnections(), event.getPlayer(), auth.display_name, NameServicePriority.High);
+
         if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
-          Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(91, 75, 27).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+          nameService.setForBatch(event.getLobby().getConnections(), event.getPlayer(), `<color=#5B4B1B>${auth.display_name}</color>`, NameServicePriority.High);
         }
 
         if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
           const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
 
-          Services.get(ServiceType.Name).setForBatch(event.getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+          const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
+
+          nameService.setForBatch(event.getLobby().getConnections(), event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
         }
       });
 
@@ -75,7 +81,9 @@ export default class extends BasePlugin {
         if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
           const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
 
-          Services.get(ServiceType.Name).setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), new TextComponent().setColor(body[0], body[1], body[2]).add(event.getPlayer().getConnection()!.getName()!), NameServicePriority.High);
+          const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
+
+          nameService.setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
         }
       });
     }

@@ -1,13 +1,12 @@
 import { UserResponseStructure } from "@polusgg/module-polusgg-auth-api/src/types/userResponseStructure";
 import { Requester } from "@polusgg/module-polusgg-auth-api/src/requester/requester";
-import { NameService, NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
+import { NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
 import { BasePlugin, PluginMetadata } from "@nodepolus/framework/src/api/plugin";
 import { MessageReader } from "@nodepolus/framework/src/util/hazelMessage";
 import { ServiceType } from "@polusgg/plugin-polusgg-api/src/types/enums";
 import { Connection } from "@nodepolus/framework/src/protocol/connection";
 import { Services } from "@polusgg/plugin-polusgg-api/src/services";
 import { DisconnectReason } from "@nodepolus/framework/src/types";
-import { TextComponent } from "@nodepolus/framework/src/api/text";
 import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
 

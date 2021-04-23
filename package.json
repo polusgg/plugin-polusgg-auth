@@ -12,6 +12,11 @@
   "bugs": {
     "url": "https://github.com/polusgg/plugin-template/issues"
   },
+  "scripts": {
+    "lint": "eslint . --ext .ts",
+    "lint-and-fix": "eslint . --ext .ts --fix",
+    "test": "ava"
+  },
   "homepage": "https://github.com/polusgg/plugin-template",
   "devDependencies": {
     "@types/node": "^14.14.22",

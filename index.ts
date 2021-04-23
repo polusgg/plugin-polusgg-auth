@@ -9,6 +9,7 @@ import { Services } from "@polusgg/plugin-polusgg-api/src/services";
 import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
+import { InnerPlayerControl } from "@nodepolus/framework/src/protocol/entities/player";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -85,6 +86,8 @@ export default class extends BasePlugin {
           nameService.setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
         }
       });
+
+      InnerPlayerControl.prototype.handleCheckName = async (): Promise<void> => new Promise(res => res());
     }
   }
 

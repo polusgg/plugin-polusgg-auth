@@ -34,7 +34,9 @@ export default class extends BasePlugin {
   private readonly requester: Requester = new Requester("https://account.polus.gg");
 
   constructor(config: PolusAuthConfig) {
-    super(pluginMetadata, undefined, config);
+    super(pluginMetadata, {
+      enableAuth: true,
+    }, config);
 
     const enableAuthPackets = process.env.NP_DISABLE_AUTH !== undefined
       ? process.env.NP_DISABLE_AUTH.trim().toLowerCase() !== "true"

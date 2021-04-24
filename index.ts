@@ -10,6 +10,7 @@ import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
 import { InnerPlayerControl } from "@nodepolus/framework/src/protocol/entities/player";
+import { Lobby } from "@nodepolus/framework/src/lobby";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -38,14 +39,12 @@ export default class extends BasePlugin {
       enableAuth: true,
     }, config);
 
-    const enableAuthPackets = process.env.NP_DISABLE_AUTH !== undefined
-      ? process.env.NP_DISABLE_AUTH.trim().toLowerCase() !== "true"
-      : config.enableAuth;
+    const enableAuthPackets = ;
 
     if (enableAuthPackets) {
       this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
-      this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
+      this.requester.setAuthenticationToken();
 
       const nameService = Services.get(ServiceType.Name);
 
@@ -87,14 +86,26 @@ export default class extends BasePlugin {
         }
       });
 
-      InnerPlayerControl.prototype.handleCheckName = async (): Promise<void> => new Promise(res => res());
+      InnerPlayerControl.prototype.handleCheckName = async function handleCheckName(this: InnerPlayerControl, _name: string, _sendTo?: Connection[]): Promise<void> {
+        const lobby = this.getLobby() as Lobby;
+        const owner = lobby.findSafeConnection(this.getOwnerId());
+        const player = lobby.findSafePlayerByConnection(owner);
+
+        lobby.getHostInstance().ensurePlayerDataExists(player);
+
+        await lobby.finishedSpawningPlayer(owner);
+
+        if (lobby.getActingHosts().length === 0) {
+          this.getConnection().syncActingHost(true);
+        }
+      };
     }
   }
 
   //#region Packet Authentication
   inboundPacketTransformer(connection: Connection, packet: MessageReader): MessageReader {
     if (packet.readByte() !== 0x80) {
-      this.getLogger().warn("Connection %s attempted to send an unauthenticated packet", connection);
+      this.getLogger().warn("Connection %s attempted to send an unauthenticated packet %s", connection, packet);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
       return MessageReader.fromRawBytes([0x00]);
@@ -104,14 +115,14 @@ export default class extends BasePlugin {
     //16 bytes for client UUID
     //20 bytes for SHA1 HMAC
     if (packet.getLength() < 1 + 16 + 20) {
-      this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. It was too short.", connection);
+      this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. It was too short. %s", connection, packet);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
       return MessageReader.fromRawBytes([0x00]);
     }
 
     if (packet.getLength() <= 1 + 16 + 20) {
-      this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. It was empty.", connection);
+      this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. It was empty. %s", connection, packet);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
       return MessageReader.fromRawBytes([0x00]);
@@ -127,7 +138,7 @@ export default class extends BasePlugin {
       const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
 
       if (!ok) {
-        this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed.", connection);
+        this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed. %s", connection, packet);
         connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
         return MessageReader.fromRawBytes([0x00]);
@@ -143,7 +154,7 @@ export default class extends BasePlugin {
         const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
 
         if (!ok) {
-          this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed.", connection);
+          this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed. %s", connection, packet);
           connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
           return;

@@ -9,8 +9,6 @@ import { Services } from "@polusgg/plugin-polusgg-api/src/services";
 import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
-import { InnerPlayerControl } from "@nodepolus/framework/src/protocol/entities/player";
-import { Lobby } from "@nodepolus/framework/src/lobby";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -88,19 +86,13 @@ export default class extends BasePlugin {
         }
       });
 
-      InnerPlayerControl.prototype.handleCheckName = async function handleCheckName(this: InnerPlayerControl, _name: string, _sendTo?: Connection[]): Promise<void> {
-        const lobby = this.getLobby() as Lobby;
-        const owner = lobby.findSafeConnection(this.getOwnerId());
-        const player = lobby.findSafePlayerByConnection(owner);
+      this.server.on("player.name.updated", event => {
+        const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
-        lobby.getHostInstance().ensurePlayerDataExists(player);
-
-        await lobby.finishedSpawningPlayer(owner);
-
-        if (lobby.getActingHosts().length === 0) {
-          this.getConnection().syncActingHost(true);
+        if (event.getNewName().toString() !== auth?.display_name) {
+          event.cancel();
         }
-      };
+      });
     }
   }
 

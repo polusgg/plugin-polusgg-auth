@@ -39,12 +39,14 @@ export default class extends BasePlugin {
       enableAuth: true,
     }, config);
 
-    const enableAuthPackets = ;
+    const enableAuthPackets = process.env.NP_DISABLE_AUTH !== undefined
+      ? process.env.NP_DISABLE_AUTH.trim().toLowerCase() !== "true"
+      : config.enableAuth;
 
     if (enableAuthPackets) {
       this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
-      this.requester.setAuthenticationToken();
+      this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
 
       const nameService = Services.get(ServiceType.Name);
 

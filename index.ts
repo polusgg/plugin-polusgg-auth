@@ -9,6 +9,7 @@ import { Services } from "@polusgg/plugin-polusgg-api/src/services";
 import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
+import { LobbyInstance } from "@nodepolus/framework/src/api/lobby";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -37,63 +38,93 @@ export default class extends BasePlugin {
       enableAuth: true,
     }, config);
 
-    const enableAuthPackets = process.env.NP_DISABLE_AUTH !== undefined
-      ? process.env.NP_DISABLE_AUTH.trim().toLowerCase() !== "true"
-      : config.enableAuth;
+    this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
-    if (enableAuthPackets) {
-      this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
+    this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
 
-      this.requester.setAuthenticationToken(process.env.NP_AUTH_TOKEN ?? config.token);
+    const nameService = Services.get(ServiceType.Name);
 
-      const nameService = Services.get(ServiceType.Name);
+    this.server.on("player.joined", event => {
+      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
-      this.server.on("player.joined", event => {
-        const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+      if (auth === undefined) {
+        return;
+      }
 
-        if (auth === undefined) {
-          return;
+      event.getPlayer().setMeta("pgg.auth.joined", true);
+
+      if (!auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
+        nameService.setForLobby(event.getPlayer(), auth.display_name, NameServicePriority.High);
+      }
+
+      if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
+        nameService.setForLobby(event.getPlayer(), `<color=#DAA520>${auth.display_name}</color>`, NameServicePriority.High);
+      }
+
+      if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
+        const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+
+        const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
+
+        nameService.setForLobby(event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
+      }
+    });
+
+    this.server.on("player.color.updated", async event => {
+      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+
+      if (!event.getPlayer().getMeta<boolean | undefined>("pgg.auth.joined")) {
+        return;
+      }
+
+      if (auth === undefined) {
+        return;
+      }
+
+      if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
+        const body = [...Palette.playerBody()[event.getNewColor()].light];
+
+        const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
+
+        const bodyOld = [...Palette.playerBody()[event.getOldColor()].light];
+
+        const nameColorOld = `${bodyOld[0].toString(16).padStart(2, "0")}${bodyOld[1].toString(16).padStart(2, "0")}${bodyOld[2].toString(16).padStart(2, "0")}`;
+
+        try {
+          await nameService.removeForLobby(event.getPlayer(), `<color=#${nameColorOld}>${auth.display_name}</color>`);
+        } catch (err) {
+          console.log(err);
         }
 
-        nameService.setForBatch(event.getLobby().getConnections(), event.getPlayer(), auth.display_name, NameServicePriority.High);
+        nameService.setForLobby(event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
+      }
+    });
 
-        if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
-          nameService.setForBatch(event.getLobby().getConnections(), event.getPlayer(), `<color=#5B4B1B>${auth.display_name}</color>`, NameServicePriority.High);
-        }
+    this.server.on("player.name.updated", event => {
+      const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
-        if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
-          const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
+      if (event.getNewName().toString() !== auth?.display_name) {
+        event.cancel();
+      }
+    });
 
-          const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
+    this.server.on("game.started", event => {
+      this.syncGameData(event.getGame().getLobby());
+    });
 
-          nameService.setForBatch(event.getLobby().getConnections(), event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
-        }
-      });
+    this.server.on("player.left", event => {
+      if (event.getPlayer().getConnection()?.isActingHost()) {
+        this.syncGameData(event.getLobby(), event.getPlayer().getConnection() ? [event.getPlayer().getSafeConnection()] : []);
+      }
+    });
+  }
 
-      this.server.on("player.color.updated", event => {
-        const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
+  syncGameData(lobby: LobbyInstance, syncFor: Connection[] = lobby.getActingHosts()): void {
+    syncFor.forEach(host => {
+      const json = Object.values(Services.get(ServiceType.GameOptions).getGameOptions(lobby).getAllOptions()).map(option => option.toJson());
 
-        if (auth === undefined) {
-          return;
-        }
-
-        if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
-          const body = [...Palette.playerBody()[event.getPlayer().getColor()].light];
-
-          const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
-
-          nameService.setForBatch(event.getPlayer().getLobby().getConnections(), event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
-        }
-      });
-
-      this.server.on("player.name.updated", event => {
-        const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
-
-        if (event.getNewName().toString() !== auth?.display_name) {
-          event.cancel();
-        }
-      });
-    }
+      this.requester.setUserGameOptions(host.getMeta<UserResponseStructure>("pgg.auth.self").client_id, json);
+    });
   }
 
   //#region Packet Authentication
@@ -125,6 +156,13 @@ export default class extends BasePlugin {
     const uuid = `${packet.readBytes(4).getBuffer().toString("hex")}-${packet.readBytes(2).getBuffer().toString("hex")}-${packet.readBytes(2).getBuffer().toString("hex")}-${packet.readBytes(2).getBuffer().toString("hex")}-${packet.readBytes(6).getBuffer().toString("hex")}`;
     const hmacResult = packet.readBytes(20);
     const remaining = packet.readRemainingBytes();
+
+    if (uuid === "00000000-0000-0000-0000-000000000000") {
+      this.getLogger().warn("Connection %s was not logged in.", connection);
+      connection.disconnect(DisconnectReason.custom("Not logged in."));
+
+      return MessageReader.fromRawBytes([0x00]);
+    }
 
     if (connection.getMeta<UserResponseStructure | undefined>("pgg.auth.self") !== undefined) {
       const user = connection.getMeta<UserResponseStructure>("pgg.auth.self");

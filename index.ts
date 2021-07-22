@@ -170,7 +170,7 @@ export default class extends BasePlugin {
       const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
 
       if (!ok) {
-        this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed. %s", connection, packet);
+        this.getLogger().warn(`(normal) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
         connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
         return MessageReader.fromRawBytes([0x00]);
@@ -186,7 +186,7 @@ export default class extends BasePlugin {
         const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
 
         if (!ok) {
-          this.getLogger().warn("Connection %s attempted to send an invalid authentication packet. Their HMAC verify failed. %s", connection, packet);
+          this.getLogger().warn(`(fetch and cache user) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
           connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
           return;

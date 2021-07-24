@@ -1,6 +1,5 @@
 import { UserResponseStructure } from "@polusgg/module-polusgg-auth-api/src/types/userResponseStructure";
 import { Requester } from "@polusgg/module-polusgg-auth-api/src/requester/requester";
-import { NameServicePriority } from "@polusgg/plugin-polusgg-api/src/services/name";
 import { BasePlugin, PluginMetadata } from "@nodepolus/framework/src/api/plugin";
 import { MessageReader } from "@nodepolus/framework/src/util/hazelMessage";
 import { ServiceType } from "@polusgg/plugin-polusgg-api/src/types/enums";
@@ -54,11 +53,11 @@ export default class extends BasePlugin {
       event.getPlayer().setMeta("pgg.auth.joined", true);
 
       if (!auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
-        nameService.setForLobby(event.getPlayer(), auth.display_name, NameServicePriority.High);
+        nameService.set(event.getPlayer(), auth.display_name);
       }
 
       if (auth.settings["name.color.gold"] && !auth.settings["name.color.match"]) {
-        nameService.setForLobby(event.getPlayer(), `<color=#DAA520>${auth.display_name}</color>`, NameServicePriority.High);
+        nameService.set(event.getPlayer(), `<color=#DAA520>${auth.display_name}</color>`);
       }
 
       if (auth.settings["name.color.match"] && !auth.settings["name.color.gold"]) {
@@ -66,11 +65,11 @@ export default class extends BasePlugin {
 
         const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
 
-        nameService.setForLobby(event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
+        nameService.set(event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`);
       }
     });
 
-    this.server.on("player.color.updated", async event => {
+    this.server.on("player.color.updated", event => {
       const auth = event.getPlayer().getConnection()?.getMeta<UserResponseStructure>("pgg.auth.self");
 
       if (!event.getPlayer().getMeta<boolean | undefined>("pgg.auth.joined")) {
@@ -86,17 +85,7 @@ export default class extends BasePlugin {
 
         const nameColor = `${body[0].toString(16).padStart(2, "0")}${body[1].toString(16).padStart(2, "0")}${body[2].toString(16).padStart(2, "0")}`;
 
-        const bodyOld = [...Palette.playerBody()[event.getOldColor()].light];
-
-        const nameColorOld = `${bodyOld[0].toString(16).padStart(2, "0")}${bodyOld[1].toString(16).padStart(2, "0")}${bodyOld[2].toString(16).padStart(2, "0")}`;
-
-        try {
-          await nameService.removeForLobby(event.getPlayer(), `<color=#${nameColorOld}>${auth.display_name}</color>`);
-        } catch (err) {
-          console.log(err);
-        }
-
-        nameService.setForLobby(event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`, NameServicePriority.High);
+        nameService.set(event.getPlayer(), `<color=#${nameColor}>${auth.display_name}</color>`);
       }
     });
 

@@ -9,6 +9,7 @@ import { DisconnectReason } from "@nodepolus/framework/src/types";
 import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
 import { LobbyInstance } from "@nodepolus/framework/src/api/lobby";
+import { HazelPacketType } from "@nodepolus/framework/src/types/enums";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -118,6 +119,10 @@ export default class extends BasePlugin {
 
   //#region Packet Authentication
   inboundPacketTransformer(connection: Connection, packet: MessageReader): MessageReader {
+    if (packet.peek(0) == HazelPacketType.Acknowledgement) {
+      return packet;
+    }
+
     if (packet.readByte() !== 0x80) {
       this.getLogger().warn("Connection %s attempted to send an unauthenticated packet %s", connection, packet);
       connection.disconnect(DisconnectReason.custom("Authentication Error."));

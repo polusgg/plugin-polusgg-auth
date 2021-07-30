@@ -10,6 +10,7 @@ import { Palette } from "@nodepolus/framework/src/static";
 import { Hmac } from "@nodepolus/framework/src/util/hmac";
 import { LobbyInstance } from "@nodepolus/framework/src/api/lobby";
 import { HazelPacketType } from "@nodepolus/framework/src/types/enums";
+import { EnumValue } from "@polusgg/plugin-polusgg-api/src/packets/root/setGameOption";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -111,9 +112,23 @@ export default class extends BasePlugin {
 
   syncGameData(lobby: LobbyInstance, syncFor: Connection[] = lobby.getActingHosts()): void {
     syncFor.forEach(host => {
-      const json = Object.values(Services.get(ServiceType.GameOptions).getGameOptions(lobby).getAllOptions()).map(option => option.toJson());
+      const json = Object.values(Services.get(ServiceType.GameOptions).getGameOptions(lobby).getAllOptions()).filter(option => option.getKey() !== "Gamemode").map(option => option.toJson());
+      const gamemode = (Services.get(ServiceType.GameOptions).getGameOptions(lobby).getOption("Gamemode")
+        .getValue() as EnumValue).getSelected();
 
-      this.requester.setUserGameOptions(host.getMeta<UserResponseStructure>("pgg.auth.self").client_id, json);
+      let o = (host.getMeta<UserResponseStructure>("pgg.auth.self").options ?? ({} as unknown as UserResponseStructure["options"]))!;
+
+      //@ts-ignore
+      if (o.version === undefined) {
+        o = {} as unknown as any;
+      }
+
+      o.gamemode = Services.get(ServiceType.GameOptions).getGameOptions(lobby).getOption("Gamemode")
+        .toJson();
+      o[gamemode] = json;
+      o.version = 1;
+
+      this.requester.setUserGameOptions(host.getMeta<UserResponseStructure>("pgg.auth.self").client_id, o);
     });
   }
 

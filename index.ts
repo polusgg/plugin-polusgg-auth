@@ -11,6 +11,7 @@ import { Hmac } from "@nodepolus/framework/src/util/hmac";
 import { LobbyInstance } from "@nodepolus/framework/src/api/lobby";
 import { HazelPacketType } from "@nodepolus/framework/src/types/enums";
 import { EnumValue } from "@polusgg/plugin-polusgg-api/src/packets/root/setGameOption";
+import { LobbyCode } from "@nodepolus/framework/src/util/lobbyCode";
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -38,6 +39,33 @@ export default class extends BasePlugin {
     super(pluginMetadata, {
       enableAuth: true,
     }, config);
+
+    if (process.env.ENABLE_AUTHAPI_LOBBY_CODES) {
+      console.log("POG");
+      this.server.on("server.lobby.creating", event => {
+        const authData = event.getConnection().getMeta<UserResponseStructure>("pgg.auth.self");
+        let currentCode = authData.settings["lobby.code.custom"] ? authData.settings["lobby.code.custom"] : event.getLobbyCode();
+        let remainingTries = 10;
+
+        while (remainingTries > 0) {
+          const fuck = this.server.getLobby(currentCode);
+
+          if (fuck === undefined) {
+            event.setLobbyCode(currentCode);
+
+            return;
+          }
+
+          currentCode = LobbyCode.generate();
+          remainingTries--;
+        }
+
+        // dream luck
+
+        event.setDisconnectReason(DisconnectReason.custom("dream luck (or the server is full)"));
+        event.cancel();
+      });
+    }
 
     this.server.setInboundPacketTransformer(this.inboundPacketTransformer.bind(this));
 
@@ -108,6 +136,25 @@ export default class extends BasePlugin {
         this.syncGameData(event.getLobby(), event.getPlayer().getConnection() ? [event.getPlayer().getSafeConnection()] : []);
       }
     });
+
+    this.server.on("lobby.host.migrated", async event => {
+      const newHostOptions = event.getNewHost().getMeta<UserResponseStructure>("pgg.auth.self").options;
+      const lobbyOptions = Services.get(ServiceType.GameOptions).getGameOptions(event.getLobby());
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (newHostOptions === null || newHostOptions === undefined || newHostOptions.version === undefined || newHostOptions.version === null) {
+        return;
+      }
+
+      const selectedOptions = newHostOptions[(lobbyOptions.getOption("Gamemode").getValue() as EnumValue).getSelected()];
+
+      for (let i = 0; i < selectedOptions.length; i++) {
+        const option = selectedOptions[i];
+        const actOpt = lobbyOptions.getOption(option.key);
+
+        actOpt.setValue(actOpt.getValue().load(option.value as any));
+      }
+    });
   }
 
   syncGameData(lobby: LobbyInstance, syncFor: Connection[] = lobby.getActingHosts()): void {
@@ -118,7 +165,7 @@ export default class extends BasePlugin {
 
       let o = (host.getMeta<UserResponseStructure>("pgg.auth.self").options ?? ({} as unknown as UserResponseStructure["options"]))!;
 
-      //@ts-ignore
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (o.version === undefined) {
         o = {} as unknown as any;
       }
@@ -214,7 +261,9 @@ export default class extends BasePlugin {
   private async fetchAndCacheUser(uuid: string, connection: Connection): Promise<UserResponseStructure> {
     return new Promise((resolve, reject) => {
       this.requester.getUser(uuid).then(user => {
+        this.logger.verbose(`Connection %s logged in as ${user.display_name}`, connection);
         connection.setMeta("pgg.auth.self", user);
+        connection.setMeta("pgg.log.uuid", user.client_id);
 
         resolve(user);
       }).catch(reject);

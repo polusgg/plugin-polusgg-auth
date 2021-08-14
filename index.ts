@@ -13,6 +13,12 @@ import { HazelPacketType } from "@nodepolus/framework/src/types/enums";
 import { EnumValue } from "@polusgg/plugin-polusgg-api/src/packets/root/setGameOption";
 import { LobbyCode } from "@nodepolus/framework/src/util/lobbyCode";
 
+const OFFSET_MAPPINGS = [
+  "UNKNOWN_NONOFFICIAL",
+  "OFFICIAL",
+  "SKELDJS"
+]
+
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
   version: [1, 0, 0],
@@ -223,13 +229,45 @@ export default class extends BasePlugin {
     if (connection.getMeta<UserResponseStructure | undefined>("pgg.auth.self") !== undefined) {
       const user = connection.getMeta<UserResponseStructure>("pgg.auth.self");
 
-      const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
+      if (!connection.hasMeta("pgg.auth.clientIdentification")) {
+        let resolved: boolean = false;
 
-      if (!ok) {
-        this.getLogger().warn(`(normal) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
-        connection.disconnect(DisconnectReason.custom("Authentication Error."));
+        for (let i = 0; i < OFFSET_MAPPINGS.length; i++) {
+          const MAPPING_NAME = OFFSET_MAPPINGS[i];
+          const bufferCopy = new Uint8Array(hmacResult.getBuffer().length);
 
-        return MessageReader.fromRawBytes([0x00]);
+          hmacResult.getBuffer().copy(bufferCopy);
+
+          Atomics.add(bufferCopy, 19, i);
+
+          const ok = Hmac.verify(remaining.getBuffer(), Buffer.from(bufferCopy).toString("hex"), user.client_token);
+
+          if (ok) {
+            resolved = true;
+            connection.setMeta("pgg.auth.clientIdentification", MAPPING_NAME);
+            connection.setMeta("pgg.auth.clientIdentification.idx", i);
+            console.log("CLIENT CONNECTED THROUGH", MAPPING_NAME);
+            break;
+          }
+        }
+
+        if (!resolved) {
+          this.getLogger().warn(`(normal-noID) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
+          connection.disconnect(DisconnectReason.custom("Authentication Error."));
+
+          return MessageReader.fromRawBytes([0x00]);
+        }
+      } else {
+        Atomics.add(hmacResult.getBuffer(), 19, connection.getMeta<number>("pgg.auth.clientIdentification.idx"));
+
+        const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
+
+        if (!ok) {
+          this.getLogger().warn(`(normal-hasID) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
+          connection.disconnect(DisconnectReason.custom("Authentication Error."));
+
+          return MessageReader.fromRawBytes([0x00]);
+        }
       }
 
       return remaining;
@@ -239,13 +277,45 @@ export default class extends BasePlugin {
 
     this.fetchAndCacheUser(uuid, connection)
       .then(user => {
-        const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
+        if (!connection.hasMeta("pgg.auth.clientIdentification")) {
+          let resolved: boolean = false;
 
-        if (!ok) {
-          this.getLogger().warn(`(fetch and cache user) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
-          connection.disconnect(DisconnectReason.custom("Authentication Error."));
+          for (let i = 0; i < OFFSET_MAPPINGS.length; i++) {
+            const MAPPING_NAME = OFFSET_MAPPINGS[i];
+            const bufferCopy = new Uint8Array(hmacResult.getBuffer().length);
 
-          return;
+            hmacResult.getBuffer().copy(bufferCopy, 0, 0);
+
+            Atomics.add(bufferCopy, 19, i);
+
+            const ok = Hmac.verify(remaining.getBuffer(), Buffer.from(bufferCopy).toString("hex"), user.client_token);
+
+            if (ok) {
+              resolved = true;
+              connection.setMeta("pgg.auth.clientIdentification", MAPPING_NAME);
+              connection.setMeta("pgg.auth.clientIdentification.idx", i);
+              console.log("CLIENT CONNECTED THROUGH", MAPPING_NAME);
+              break;
+            }
+          }
+
+          if (!resolved) {
+            this.getLogger().warn(`(fetch and cache user-noID) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
+            connection.disconnect(DisconnectReason.custom("Authentication Error."));
+
+            return;
+          }
+        } else {
+          Atomics.add(hmacResult.getBuffer(), 19, connection.getMeta<number>("pgg.auth.clientIdentification.idx"));
+
+          const ok = Hmac.verify(remaining.getBuffer(), hmacResult.getBuffer().toString("hex"), user.client_token);
+
+          if (!ok) {
+            this.getLogger().warn(`(fetch and cache user-hasID) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
+            connection.disconnect(DisconnectReason.custom("Authentication Error."));
+
+            return;
+          }
         }
 
         connection.emit("message", remaining);

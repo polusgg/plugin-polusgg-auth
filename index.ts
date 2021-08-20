@@ -12,12 +12,13 @@ import { LobbyInstance } from "@nodepolus/framework/src/api/lobby";
 import { HazelPacketType } from "@nodepolus/framework/src/types/enums";
 import { EnumValue } from "@polusgg/plugin-polusgg-api/src/packets/root/setGameOption";
 import { LobbyCode } from "@nodepolus/framework/src/util/lobbyCode";
+import { PlayerInstance } from "@nodepolus/framework/src/api/player";
 
 const OFFSET_MAPPINGS = [
   "UNKNOWN_NONOFFICIAL",
   "OFFICIAL",
-  "SKELDJS"
-]
+  "SKELDJS",
+];
 
 const pluginMetadata: PluginMetadata = {
   name: "PolusAuth",
@@ -135,15 +136,25 @@ export default class extends BasePlugin {
 
     this.server.on("game.started", event => {
       this.syncGameData(event.getGame().getLobby());
+
+      const players = event.getGame().getLobby().getPlayers();
+
+      for (let i = 0; i < players.length; i++) {
+        const player = players[i];
+
+        this.updatePlayerCosmetics(player);
+      }
     });
 
     this.server.on("player.left", event => {
+      this.updatePlayerCosmetics(event.getPlayer());
+
       if (event.getPlayer().getConnection()?.isActingHost()) {
         this.syncGameData(event.getLobby(), event.getPlayer().getConnection() ? [event.getPlayer().getSafeConnection()] : []);
       }
     });
 
-    this.server.on("lobby.host.migrated", async event => {
+    this.server.on("lobby.host.migrated", event => {
       const newHostOptions = event.getNewHost().getMeta<UserResponseStructure>("pgg.auth.self").options;
       const lobbyOptions = Services.get(ServiceType.GameOptions).getGameOptions(event.getLobby());
 
@@ -160,6 +171,21 @@ export default class extends BasePlugin {
 
         actOpt.setValue(actOpt.getValue().load(option.value as any));
       }
+    });
+  }
+
+  updatePlayerCosmetics(player: PlayerInstance): void {
+    const connection = player.getConnection();
+
+    if (connection === undefined) {
+      return;
+    }
+
+    this.requester.setUserCosmetics(connection.getMeta<UserResponseStructure>("pgg.auth.self").client_id, {
+      HAT: player.getHat(),
+      PET: player.getPet(),
+      SKIN: player.getSkin(),
+      COLOR: player.getColor(),
     });
   }
 
@@ -230,7 +256,7 @@ export default class extends BasePlugin {
       const user = connection.getMeta<UserResponseStructure>("pgg.auth.self");
 
       if (!connection.hasMeta("pgg.auth.clientIdentification")) {
-        let resolved: boolean = false;
+        let resolved = false;
 
         for (let i = 0; i < OFFSET_MAPPINGS.length; i++) {
           const MAPPING_NAME = OFFSET_MAPPINGS[i];
@@ -278,7 +304,7 @@ export default class extends BasePlugin {
     this.fetchAndCacheUser(uuid, connection)
       .then(user => {
         if (!connection.hasMeta("pgg.auth.clientIdentification")) {
-          let resolved: boolean = false;
+          let resolved = false;
 
           for (let i = 0; i < OFFSET_MAPPINGS.length; i++) {
             const MAPPING_NAME = OFFSET_MAPPINGS[i];

@@ -159,7 +159,7 @@ export default class extends BasePlugin {
       const lobbyOptions = Services.get(ServiceType.GameOptions).getGameOptions(event.getLobby());
 
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (newHostOptions === null || newHostOptions === undefined || newHostOptions.version === undefined || newHostOptions.version === null) {
+      if (newHostOptions === null || newHostOptions === undefined || newHostOptions.version === undefined || newHostOptions.version === null || event.getLobby().getGame() !== undefined) {
         return;
       }
 
@@ -169,7 +169,8 @@ export default class extends BasePlugin {
         const option = selectedOptions[i];
         const actOpt = lobbyOptions.getOption(option.key);
 
-        actOpt.setValue(actOpt.getValue().load(option.value as any));
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        actOpt?.setValue(actOpt.getValue().load(option.value as any));
       }
     });
   }

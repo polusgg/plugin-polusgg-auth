@@ -362,6 +362,14 @@ export default class extends BasePlugin {
         connection.setMeta("pgg.auth.self", user);
         connection.setMeta("pgg.log.uuid", user.client_id);
 
+        if (user.banned) {
+          if (user.banned_until) {
+            connection.disconnect(DisconnectReason.custom(`Banned until ${new Date(user.banned_until).toDateString()} ${new Date(user.banned_until).toTimeString()}`));
+          } else {
+            connection.disconnect(DisconnectReason.custom(`Banned permanently`));
+          }
+        }
+
         resolve(user);
       }).catch(reject);
     });

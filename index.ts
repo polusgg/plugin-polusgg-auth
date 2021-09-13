@@ -163,14 +163,16 @@ export default class extends BasePlugin {
         return;
       }
 
-      const selectedOptions = newHostOptions[(lobbyOptions.getOption("Gamemode").getValue() as EnumValue).getSelected()];
+      const selectedOptions = newHostOptions[(lobbyOptions.getOption("Gamemode").getValue() as EnumValue).getSelected()] as any[] | undefined;
 
-      for (let i = 0; i < selectedOptions.length; i++) {
-        const option = selectedOptions[i];
-        const actOpt = lobbyOptions.getOption(option.key);
+      if (selectedOptions) {
+        for (let i = 0; i < selectedOptions.length; i++) {
+          const option = selectedOptions[i];
+          const actOpt = lobbyOptions.getOption(option.key);
 
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        actOpt?.setValue(actOpt.getValue().load(option.value as any));
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          actOpt?.setValue(actOpt.getValue().load(option.value as any));
+        }
       }
     });
   }

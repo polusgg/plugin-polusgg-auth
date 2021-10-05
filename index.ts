@@ -218,36 +218,6 @@ export default class extends BasePlugin {
 
   //#region Packet Authentication
   inboundPacketTransformer(connection: Connection, packet: MessageReader): MessageReader {
-    if (!this.authTimeouts.has(connection)) {
-      this.authTimeouts.set(connection, setInterval(() => {
-        if (connection === undefined) {
-          const timeout = this.authTimeouts.get(connection);
-          if (timeout !== undefined) {
-            clearInterval(timeout)
-            this.authTimeouts.delete(connection)
-          }
-
-          return;
-        }
-
-        const lastAuthPacketTime = connection.getMeta<number>('lastAuthPacketTime')
-        if (lastAuthPacketTime === null || lastAuthPacketTime === 0) {
-          return;
-        }
-
-        if (Date.now() - lastAuthPacketTime > 8000) {
-          connection.disconnect(DisconnectReason.custom("Did not receive any authenticated packets for 8000ms"));
-
-          const timeout = this.authTimeouts.get(connection);
-          if (timeout !== undefined) {
-            clearInterval(timeout)
-            this.authTimeouts.delete(connection)
-          }
-
-        }
-      }, 8000))
-    }
-
     if (packet.peek(0) == HazelPacketType.Acknowledgement) {
       return packet;
     }
@@ -328,8 +298,6 @@ export default class extends BasePlugin {
           return MessageReader.fromRawBytes([0x00]);
         }
       }
-
-      connection.setMeta("lastAuthPacketTime", Date.now())
       return remaining;
     }
 

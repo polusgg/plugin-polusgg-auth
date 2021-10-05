@@ -42,6 +42,8 @@ type PolusAuthConfig = {
 export default class extends BasePlugin {
   private readonly requester: Requester = new Requester("https://account.polus.gg");
 
+  private readonly authTimeouts: Map<Connection, NodeJS.Timeout> = new Map();
+
   constructor(config: PolusAuthConfig) {
     super(pluginMetadata, {
       enableAuth: true,
@@ -216,6 +218,36 @@ export default class extends BasePlugin {
 
   //#region Packet Authentication
   inboundPacketTransformer(connection: Connection, packet: MessageReader): MessageReader {
+    if (!this.authTimeouts.has(connection)) {
+      this.authTimeouts.set(connection, setInterval(() => {
+        if (connection === undefined) {
+          const timeout = this.authTimeouts.get(connection);
+          if (timeout !== undefined) {
+            clearInterval(timeout)
+            this.authTimeouts.delete(connection)
+          }
+
+          return;
+        }
+
+        const lastAuthPacketTime = connection.getMeta<number>('lastAuthPacketTime')
+        if (lastAuthPacketTime === null || lastAuthPacketTime === 0) {
+          return;
+        }
+
+        if (Date.now() - lastAuthPacketTime > 8000) {
+          connection.disconnect(DisconnectReason.custom("Did not receive any authenticated packets for 8000ms"));
+
+          const timeout = this.authTimeouts.get(connection);
+          if (timeout !== undefined) {
+            clearInterval(timeout)
+            this.authTimeouts.delete(connection)
+          }
+
+        }
+      }, 8000))
+    }
+
     if (packet.peek(0) == HazelPacketType.Acknowledgement) {
       return packet;
     }
@@ -250,7 +282,6 @@ export default class extends BasePlugin {
 
     if (uuid === "00000000-0000-0000-0000-000000000000") {
       this.getLogger().warn("Connection %s was not logged in.", connection);
-      connection.disconnect(DisconnectReason.custom("Not logged in."));
 
       return MessageReader.fromRawBytes([0x00]);
     }
@@ -293,12 +324,12 @@ export default class extends BasePlugin {
 
         if (!ok) {
           this.getLogger().warn(`(normal-hasID) Connection %s, (Name: ${user.display_name}, token: ${user.client_token}) attempted to send an invalid authentication packet. Their HMAC verify failed. %s`, connection, packet);
-          connection.disconnect(DisconnectReason.custom("Authentication Error."));
 
           return MessageReader.fromRawBytes([0x00]);
         }
       }
 
+      connection.setMeta("lastAuthPacketTime", Date.now())
       return remaining;
     }
 

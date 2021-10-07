@@ -42,8 +42,6 @@ type PolusAuthConfig = {
 export default class extends BasePlugin {
   private readonly requester: Requester = new Requester("https://account.polus.gg");
 
-  private readonly authTimeouts: Map<Connection, NodeJS.Timeout> = new Map();
-
   constructor(config: PolusAuthConfig) {
     super(pluginMetadata, {
       enableAuth: true,

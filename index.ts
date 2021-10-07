@@ -184,12 +184,17 @@ export default class extends BasePlugin {
       return;
     }
 
-    this.requester.setUserCosmetics(connection.getMeta<UserResponseStructure>("pgg.auth.self").client_id, {
+    const newCosmetics = {
       HAT: player.getHat(),
       PET: player.getPet(),
       SKIN: player.getSkin(),
       COLOR: player.getColor(),
-    });
+    };
+
+    // actually update the locally cached cosmetics
+    connection.getMeta<UserResponseStructure>("pgg.auth.self").cosmetics = newCosmetics;
+
+    this.requester.setUserCosmetics(connection.getMeta<UserResponseStructure>("pgg.auth.self").client_id, newCosmetics);
   }
 
   syncGameData(lobby: LobbyInstance, syncFor: Connection[] = lobby.getActingHosts()): void {
